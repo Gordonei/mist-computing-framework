@@ -5,12 +5,12 @@ import logging
 import random
 import time
 import hashlib
-import quotes
 from urllib.parse import urlparse, parse_qs
 
-PORT = 8000
+import quotes
+import twitter_url_getter
 
-REDIRCT_URL = "https://twitter.com/Gord1ei/status/830314829063843840"
+PORT = 8000
 
 
 class GetHandler(http.server.SimpleHTTPRequestHandler):
@@ -18,9 +18,9 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Origin', '*')
         http.server.SimpleHTTPRequestHandler.end_headers(self)
 
-    def do_GET(self):
-        logging.info(self)
+        return
 
+    def do_GET(self):
         # Response Code
         self.send_response(200)
 
@@ -33,25 +33,32 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         # Content of Response
         response_message = None
         if ("Response" in query_components):
-            logging.debug("Checking response")
+            logger.debug("Checking response")
             client_response = query_components["Response"][0]
             client_id = query_components["RequestId"][0]
-            logging.debug("Received response: %s (%s)" % (client_response, client_id))
-            logging.debug("  Actual response: %s" % (
+            logger.debug("Received response: %s (%s)" % (client_response, client_id))
+            logger.debug("  Actual response: %s" % (
             hashlib.sha256(quotes.RANDOM_QUOTES()[int(client_id)].encode("utf-8")).hexdigest()))
 
-            time.sleep(5)
-            response_message = (u'%s' % REDIRCT_URL).encode("utf-8")
+            time.sleep(1)
+            redirect_url = url_getter.get_url("Gord1ei/news-journos")
+            response_message = (u'%s' % redirect_url).encode("utf-8")
         else:
             choice = random.randint(0, len(quotes.RANDOM_QUOTES()))
             quote = quotes.RANDOM_QUOTES()[choice]
-            logging.debug("Asking to encode %s (%d)" % (quote, choice))
+            logger.debug("Asking to encode %s (%d)" % (quote, choice))
             response_message = (u'%s\n%d' % (quotes.RANDOM_QUOTES()[choice], choice)).encode("utf-8")
+
         self.wfile.write(response_message)
 
         return
 
+logger = logging.getLogger('server.py')
+logger.setLevel("DEBUG")
+FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT)
 
+url_getter = twitter_url_getter.TwitterUrlGetter()
 httpd = http.server.HTTPServer(("", PORT), GetHandler)
 
 httpd.serve_forever()
