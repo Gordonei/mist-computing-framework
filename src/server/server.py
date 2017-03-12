@@ -53,41 +53,12 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
 
         response_message = json.dumps(response_dict)
 
-        """
-        query_components = parse_qs(urlparse(self.path).query)
-
-        # Content of Response
-        response_message = None
-        if ("Response" in query_components):
-            logger.debug("Checking response")
-            client_response = query_components["Response"][0]
-            client_id = query_components["RequestId"][0]
-            logger.debug("Received response: %s (%s)" % (client_response, client_id))
-            logger.debug("  Actual response: %s" % (
-            hashlib.sha256(quotes.RANDOM_QUOTES()[int(client_id)].encode("utf-8")).hexdigest()))
-
-            redirect_url = url_getter.get_url("Gord1ei/news-journos")
-            response_message = (u'%s' % redirect_url).encode("utf-8")
-            #time.sleep(1)
-        else:
-            choice = random.randint(0, len(quotes.RANDOM_QUOTES()))
-            quote = quotes.RANDOM_QUOTES()[choice]
-            logger.debug("Asking to encode %s (%d)" % (quote, choice))
-            response_message = (u'%s\n%d' % (quotes.RANDOM_QUOTES()[choice], choice)).encode("utf-8")
-        """
-
         self.wfile.write(response_message.encode("utf-8"))
 
         return
 
     def do_PUT(self):
-        # Response Code
-        self.send_response(200)
-
-        # Headers
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-
+        # Checking content
         length = int(self.headers['Content-Length'])
         content = self.rfile.read(length)
         response = json.loads(content.decode("utf-8"))
@@ -96,10 +67,22 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         wid = int(response["wid"])
         check = hashlib.sha256(quotes.RANDOM_QUOTES()[int(wid)].encode("utf-8")).hexdigest()
 
-        redirect_url = url_getter.get_url("Gord1ei/news-journos")
-        response_message = redirect_url.encode("utf-8")
+        # Response Code
+        retry = random.randint(0,10) < 9
 
-        self.wfile.write(response_message)
+        if(retry):
+            self.send_response(204)
+        else:
+            self.send_response(200)
+
+        # Headers
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+
+        if not(retry):
+            redirect_url = url_getter.get_url("Gord1ei/news-journos")
+            response_message = redirect_url.encode("utf-8")
+            self.wfile.write(response_message)
 
         return
 

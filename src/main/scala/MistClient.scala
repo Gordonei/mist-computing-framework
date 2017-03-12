@@ -45,8 +45,7 @@ object MistClient extends JSApp{
   val WorkRequest = formHttpRequest()
 
   def askForWork(): Unit = {
-    println("About to send request")
-    val req = WorkRequest.send() //HttpRequest.send()
+    val req = WorkRequest.send()
 
     req.onComplete({
       case res: Success[SimpleHttpResponse] =>
@@ -62,13 +61,12 @@ object MistClient extends JSApp{
   }
 
   def redirect (redirectUrl: String): Unit = {
-    //dom.window.location.href = redirectUrl
+    dom.window.location.href = redirectUrl
     println(s"Redirect URL: $redirectUrl")
     jQuery("#textBox").append(s"<p> Redirected. </p>")
   }
 
   def doTheWork(responseBody: String): Unit = {
-    println(responseBody)
     val params = g.JSON.parse(responseBody)
     /*
     payload, the workload parameters
@@ -93,7 +91,13 @@ object MistClient extends JSApp{
       case res:Success[SimpleHttpResponse] =>
         jQuery("#loader").hide()
         jQuery("#textBox").append("<p> Response accepted </p> <p> Redirecting... </p>")
-        redirect(res.get.body)
+        jQuery("#textBox").append(s"<p> Response code ${res.get.statusCode} </p>")
+
+        val responseCode = res.get.statusCode
+        responseCode match{
+          case 200 => redirect(res.get.body)
+          case 204 => askForWork()
+        }
       case e: Failure[SimpleHttpResponse] =>
         jQuery("#textBox").append("<p> Response not accepted </p>")
     })
