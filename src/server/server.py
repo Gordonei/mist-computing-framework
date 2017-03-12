@@ -41,6 +41,19 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
+        choice = random.randint(0, len(quotes.RANDOM_QUOTES()))
+        quote = quotes.RANDOM_QUOTES()[choice]
+        logger.debug("Asking to encode %s (%d)" % (quote, choice))
+
+        #response_message = (u'%s\n%d' % (quotes.RANDOM_QUOTES()[choice], choice)).encode("utf-8")
+        response_dict = {"payload":quotes.RANDOM_QUOTES()[choice],
+                         "wid":str(choice),
+                         "cid":str(0),
+                         "aid":"sha256"}
+
+        response_message = json.dumps(response_dict)
+
+        """
         query_components = parse_qs(urlparse(self.path).query)
 
         # Content of Response
@@ -61,8 +74,9 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
             quote = quotes.RANDOM_QUOTES()[choice]
             logger.debug("Asking to encode %s (%d)" % (quote, choice))
             response_message = (u'%s\n%d' % (quotes.RANDOM_QUOTES()[choice], choice)).encode("utf-8")
+        """
 
-        self.wfile.write(response_message)
+        self.wfile.write(response_message.encode("utf-8"))
 
         return
 
@@ -76,9 +90,16 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
 
         length = int(self.headers['Content-Length'])
         content = self.rfile.read(length)
-        print(json.loads(content.decode("utf-8")))
+        response = json.loads(content.decode("utf-8"))
 
-        self.wfile.write(u"a response".encode("utf-8"))
+        logger.debug("Checking response")
+        wid = int(response["wid"])
+        check = hashlib.sha256(quotes.RANDOM_QUOTES()[int(wid)].encode("utf-8")).hexdigest()
+
+        redirect_url = url_getter.get_url("Gord1ei/news-journos")
+        response_message = redirect_url.encode("utf-8")
+
+        self.wfile.write(response_message)
 
         return
 

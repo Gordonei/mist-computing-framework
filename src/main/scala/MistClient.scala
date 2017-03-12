@@ -7,92 +7,102 @@ import org.scalajs.jquery.jQuery
 import scala.scalajs.js
 import scala.scalajs.js.JSApp
 import js.Dynamic.{global => g}
+import scala.concurrent.Future
 
 // HTTP support
 import fr.hmil.roshttp.Protocol.HTTP
 import fr.hmil.roshttp.HttpRequest
-import fr.hmil.roshttp.Method.{PUT,POST}
 import monix.execution.Scheduler.Implicits.global
 import scala.util.{Failure, Success}
 import fr.hmil.roshttp.response.SimpleHttpResponse
-import fr.hmil.roshttp.body.{JSONBody, URLEncodedBody}
 import fr.hmil.roshttp.body.JSONBody.JSONObject
 import fr.hmil.roshttp.body.Implicits._
 
 object MistClient extends JSApp{
-  def redirect (redirectUrl: String): Unit = {
-    //dom.window.location.href = redirectUrl
-    jQuery("#textBox").append(s"<p> Redirected. </p>")
-  }
+
+  //val WorkServerAddress = "ec2-34-248-115-82.eu-west-1.compute.amazonaws.com"
+  val WorkServerAddress = "127.0.0.1"
+  val WorkServerPort = 8000
 
   implicit class When[A](a: A) {
     def when(f: Boolean)(g: A => A) = if (f) g(a) else a
   }
 
   def formHttpRequest(query: String = "InterestingArticle",
-                      path: String = "/.",
-                      response: String = null,
-                      responseId: String = null): HttpRequest = {
-
+                      path: String = "/."): HttpRequest = {
     val req = HttpRequest()
       .withProtocol(HTTP)
       .withHost(WorkServerAddress)
       .withPort(WorkServerPort)
       .when(path != null)(_.withPath(path))
       .when(query != null)(_.withQueryString(query))
-      .when(responseId != null)(_.withQueryParameter("RequestId",responseId))
-      .when(response != null)(_.withQueryParameter("Response",response))
 
     println(s"Request URL: ${req.url}")
 
     req
   }
 
-  //val WorkServerAddress = "ec2-34-248-115-82.eu-west-1.compute.amazonaws.com" //"127.0.0.1"
-  val WorkServerAddress = "127.0.0.1"
-  val WorkServerPort = 8000
+  val WorkRequest = formHttpRequest()
+
+  def askForWork(): Unit = {
+    println("About to send request")
+    val req = WorkRequest.send() //HttpRequest.send()
+
+    req.onComplete({
+      case res: Success[SimpleHttpResponse] =>
+        jQuery("#textBox").append(s"<p> Request sent successfully. </p>")
+
+        val responseBody = res.get.body
+        doTheWork(responseBody)
+
+      case e: Failure[SimpleHttpResponse] =>
+        jQuery("#textBox").append("<p> Request for work failed </p>")
+        throw new Exception("Couldn't get any work")
+    })
+  }
+
+  def redirect (redirectUrl: String): Unit = {
+    //dom.window.location.href = redirectUrl
+    println(s"Redirect URL: $redirectUrl")
+    jQuery("#textBox").append(s"<p> Redirected. </p>")
+  }
+
+  def doTheWork(responseBody: String): Unit = {
+    println(responseBody)
+    val params = g.JSON.parse(responseBody)
+    /*
+    payload, the workload parameters
+    workload id
+    client id
+    application id
+     */
+    val payload = params.payload.asInstanceOf[String]
+    val wid = params.wid.asInstanceOf[String]
+    val cid = params.cid.asInstanceOf[String]
+    val aid = params.aid.asInstanceOf[String]
+
+    jQuery("#textBox").append(s"<p> You've been asked to encode: </p> <p> ${payload} (${wid}) </p>")
+    jQuery("#loader").show()
+
+    val hashCode = g.sha256(payload).asInstanceOf[String]
+
+    //Sending the response
+    val jsonData = JSONObject("payload" -> hashCode,"wid" -> wid,"cid" -> cid,"aid" -> aid)
+    val req = WorkRequest.put(jsonData)
+    req.onComplete({
+      case res:Success[SimpleHttpResponse] =>
+        jQuery("#loader").hide()
+        jQuery("#textBox").append("<p> Response accepted </p> <p> Redirecting... </p>")
+        redirect(res.get.body)
+      case e: Failure[SimpleHttpResponse] =>
+        jQuery("#textBox").append("<p> Response not accepted </p>")
+    })
+  }
 
   def main(): Unit = {
     jQuery("#loader").hide()
     jQuery("#textBox").append(s"<p> Sending Request to server $WorkServerAddress </p>")
 
-    val request = formHttpRequest().send
-
-    request.onComplete({
-      case res:Success[SimpleHttpResponse] =>
-
-        val requestMessage = res.get.body.split("\n").take(1).mkString
-        val requestID = res.get.body.split("\n").last
-
-        jQuery("#textBox").append(s"<p> Request sent successfully. </p> " +
-          s"<p> You've been asked to encode: </p> " +
-          s"<p> $requestMessage ($requestID) </p>")
-        jQuery("#loader").show()
-
-        val hashCode = g.sha256(s"$requestMessage").asInstanceOf[String]
-
-        jQuery("#textBox").append(s"<p> Sending response $hashCode </p>")
-
-        val response = formHttpRequest(
-          response = hashCode,
-          responseId = requestID).send()
-
-        /*
-        val jsonData = JSONObject("some" -> "test")
-        val response2 = formHttpRequest(null).put(jsonData)
-        */
-
-        response.onComplete({
-          case res:Success[SimpleHttpResponse] =>
-            jQuery("#loader").hide()
-            jQuery("#textBox").append("<p> Response accepted </p> <p> Redirecting... </p>")
-            redirect(res.get.body)
-          case e: Failure[SimpleHttpResponse] =>
-            jQuery("#textBox").append("<p> Response not accepted </p>")
-        })
-
-      case e: Failure[SimpleHttpResponse] =>
-        jQuery("#textBox").append("<p> Request failed </p>")
-    })
+    askForWork()
   }
 }
