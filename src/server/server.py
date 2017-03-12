@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 
+# Built-ins
 import http.server
 import logging
 import random
 import time
 import hashlib
 from urllib.parse import urlparse, parse_qs
+import json
 
+# Mine
 import quotes
 import twitter_url_getter
 
@@ -16,7 +19,17 @@ PORT = 8000
 class GetHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS')
+        self.send_header("Access-Control-Allow-Headers", "X-Requested-With, Content-Type")
+
         http.server.SimpleHTTPRequestHandler.end_headers(self)
+
+        return
+
+    def do_OPTIONS(self):
+        self.send_response(200, "ok")
+
+        self.end_headers()
 
         return
 
@@ -40,9 +53,9 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
             logger.debug("  Actual response: %s" % (
             hashlib.sha256(quotes.RANDOM_QUOTES()[int(client_id)].encode("utf-8")).hexdigest()))
 
-            time.sleep(1)
             redirect_url = url_getter.get_url("Gord1ei/news-journos")
             response_message = (u'%s' % redirect_url).encode("utf-8")
+            #time.sleep(1)
         else:
             choice = random.randint(0, len(quotes.RANDOM_QUOTES()))
             quote = quotes.RANDOM_QUOTES()[choice]
@@ -50,6 +63,22 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
             response_message = (u'%s\n%d' % (quotes.RANDOM_QUOTES()[choice], choice)).encode("utf-8")
 
         self.wfile.write(response_message)
+
+        return
+
+    def do_PUT(self):
+        # Response Code
+        self.send_response(200)
+
+        # Headers
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+
+        length = int(self.headers['Content-Length'])
+        content = self.rfile.read(length)
+        print(json.loads(content.decode("utf-8")))
+
+        self.wfile.write(u"a response".encode("utf-8"))
 
         return
 
