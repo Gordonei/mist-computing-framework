@@ -62,12 +62,17 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         length = int(self.headers['Content-Length'])
         content = self.rfile.read(length)
         response = json.loads(content.decode("utf-8"))
+        self.log_message("Received response: %s",response["payload"])
 
         logger.debug("Checking response")
         wid = int(response["wid"])
         check = hashlib.sha256(quotes.RANDOM_QUOTES()[int(wid)].encode("utf-8")).hexdigest()
 
+        self.log_message(" Correct response: %s",check)
+
         # Response Code
+        # 204 means try again
+        # 200 means redirect link included
         retry = random.randint(0,10) < 9
 
         if(retry):
