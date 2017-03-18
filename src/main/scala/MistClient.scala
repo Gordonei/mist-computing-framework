@@ -1,13 +1,11 @@
 package mist.client
 
-
+// Scala.js
 import org.scalajs.dom
 import org.scalajs.jquery.jQuery
-
 import scala.scalajs.js
 import scala.scalajs.js.JSApp
-import js.Dynamic.{global => g}
-import scala.concurrent.Future
+import js.Dynamic.{global => js}
 
 // HTTP support
 import fr.hmil.roshttp.Protocol.HTTP
@@ -20,8 +18,8 @@ import fr.hmil.roshttp.body.Implicits._
 
 object MistClient extends JSApp{
 
-  //val WorkServerAddress = "ec2-34-248-115-82.eu-west-1.compute.amazonaws.com"
-  val WorkServerAddress = "127.0.0.1"
+  //val WorkServerAddress = "127.0.0.1"
+  val WorkServerAddress = "mist-computing-demo.xyz"
   val WorkServerPort = 8000
 
   implicit class When[A](a: A) {
@@ -67,25 +65,16 @@ object MistClient extends JSApp{
   }
 
   def doTheWork(responseBody: String): Unit = {
-    val params = g.JSON.parse(responseBody)
-    /*
-    payload, the workload parameters
-    workload id
-    client id
-    application id
-     */
-    val payload = params.payload.asInstanceOf[String]
-    val wid = params.wid.asInstanceOf[String]
-    val cid = params.cid.asInstanceOf[String]
-    val aid = params.aid.asInstanceOf[String]
+    val work = new WorkUnit(responseBody)
 
-    jQuery("#textBox").append(s"<p> You've been asked to encode: </p> <p> ${payload} (${wid}) </p>")
+    jQuery("#textBox").append(s"<p> You've been asked to encode: </p> <p> ${work.payload} </p>")
     jQuery("#loader").show()
 
-    val hashCode = g.sha256(payload).asInstanceOf[String]
+    val hashCode = js.sha256(work.payload).asInstanceOf[String]
 
     //Sending the response
-    val jsonData = JSONObject("payload" -> hashCode,"wid" -> wid,"cid" -> cid,"aid" -> aid)
+    val jsonData = work.formResponse(hashCode)
+
     val req = WorkRequest.put(jsonData)
     req.onComplete({
       case res:Success[SimpleHttpResponse] =>
@@ -109,4 +98,17 @@ object MistClient extends JSApp{
 
     askForWork()
   }
+}
+
+class WorkUnit(rawBody: String){
+  val params = js.JSON.parse(rawBody)
+
+  val payload = params.payload.asInstanceOf[String]
+  private val wid = params.wid.asInstanceOf[String]
+  private val cid = params.cid.asInstanceOf[String]
+  private val aid = params.aid.asInstanceOf[String]
+
+  def formResponse (responsePayload: String) =
+    JSONObject("payload" -> responsePayload,"wid" -> wid,"cid" -> cid,"aid" -> aid)
+
 }
