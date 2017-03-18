@@ -26,6 +26,7 @@ object MistClient extends JSApp{
     def when(f: Boolean)(g: A => A) = if (f) g(a) else a
   }
 
+  // HTTP Request forming
   def formHttpRequest(query: String = "InterestingArticle",
                       path: String = "/."): HttpRequest = {
     val req = HttpRequest()
@@ -42,73 +43,99 @@ object MistClient extends JSApp{
 
   val WorkRequest = formHttpRequest()
 
+  // Appending text to Text Box
+  def appendText(messages: Iterable[String]): Unit = {
+    messages.foreach {
+      message => jQuery("#textBox").append(s"<p> $message </p>")
+    }
+  }
+
+  // Making GET request for work
   def askForWork(): Unit = {
     val req = WorkRequest.send()
 
     req.onComplete({
       case res: Success[SimpleHttpResponse] =>
-        jQuery("#textBox").append(s"<p> Request sent successfully. </p>")
+        appendText(Seq("Request sent successfully."))
 
         val responseBody = res.get.body
         doTheWork(responseBody)
 
       case e: Failure[SimpleHttpResponse] =>
-        jQuery("#textBox").append("<p> Request for work failed </p>")
+        appendText(Seq("Request for work failed"))
         throw new Exception("Couldn't get any work")
     })
   }
 
+  // PUT result to server
   def redirect (redirectUrl: String): Unit = {
     dom.window.location.href = redirectUrl
     println(s"Redirect URL: $redirectUrl")
-    jQuery("#textBox").append(s"<p> Redirected. </p>")
+    appendText(Seq("Redirected."))
   }
 
   def doTheWork(responseBody: String): Unit = {
     val work = new WorkUnit(responseBody)
 
-    jQuery("#textBox").append(s"<p> You've been asked to encode: </p> <p> ${work.payload} </p>")
+    appendText(Seq("You've been asked to encode:",s"${work.payload}"))
     jQuery("#loader").show()
 
-    val hashCode = g.sha256(work.payload).asInstanceOf[String]
+    val workResult = Applications.process(work.aid,work.payload)
 
     //Sending the response
-    val jsonData = work.formResponse(hashCode)
+    val jsonData = work.formResponse(workResult)
 
     val req = WorkRequest.put(jsonData)
     req.onComplete({
       case res:Success[SimpleHttpResponse] =>
         jQuery("#loader").hide()
-        jQuery("#textBox").append("<p> Response accepted </p> <p> Redirecting... </p>")
-        jQuery("#textBox").append(s"<p> Response code ${res.get.statusCode} </p>")
+        appendText(Seq("Response accepted","Redirecting..."))
+        appendText(Seq("Response code ${res.get.statusCode}"))
 
         val responseCode = res.get.statusCode
         responseCode match{
+          // 200 means there is a response in the link
           case 200 => redirect(res.get.body)
+          // 204 means there is more work to do
           case 204 => askForWork()
         }
       case e: Failure[SimpleHttpResponse] =>
-        jQuery("#textBox").append("<p> Response not accepted </p>")
+        appendText(Seq("Response not accepted"))
     })
   }
 
   def main(): Unit = {
     jQuery("#loader").hide()
-    jQuery("#textBox").append(s"<p> Sending Request to server $WorkServerAddress </p>")
+    appendText(Seq(s"Sending Request to server $WorkServerAddress"))
 
     askForWork()
+  }
+}
+
+object Applications {
+  def process(payload: String, aid: String): String = {
+    // Application ID selects what work to do
+    aid match {
+      case "sha256" => g.sha256(payload).asInstanceOf[String]
+      case _ =>
+        jQuery("#textBox").append("<p> Request for work failed </p>")
+        throw new Exception("Couldn't get any work")
+    }
   }
 }
 
 class WorkUnit(rawBody: String){
   val params = g.JSON.parse(rawBody)
 
+  // Payload
   val payload = params.payload.asInstanceOf[String]
+  // Application ID
+  val aid = params.aid.asInstanceOf[String]
+  // Work ID
   private val wid = params.wid.asInstanceOf[String]
+  // Client ID
   private val cid = params.cid.asInstanceOf[String]
-  private val aid = params.aid.asInstanceOf[String]
 
   def formResponse (responsePayload: String) =
     JSONObject("payload" -> responsePayload,"wid" -> wid,"cid" -> cid,"aid" -> aid)
-
 }

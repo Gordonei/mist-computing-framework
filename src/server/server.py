@@ -6,7 +6,6 @@ import logging
 import random
 import time
 import hashlib
-from urllib.parse import urlparse, parse_qs
 import json
 
 # Mine
@@ -45,7 +44,6 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         quote = quotes.RANDOM_QUOTES()[choice]
         logger.debug("Asking to encode %s (%d)" % (quote, choice))
 
-        #response_message = (u'%s\n%d' % (quotes.RANDOM_QUOTES()[choice], choice)).encode("utf-8")
         response_dict = {"payload":quotes.RANDOM_QUOTES()[choice],
                          "wid":str(choice),
                          "cid":str(0),
