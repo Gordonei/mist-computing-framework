@@ -5,7 +5,7 @@ import org.scalajs.dom
 import org.scalajs.jquery.jQuery
 import scala.scalajs.js
 import scala.scalajs.js.JSApp
-import js.Dynamic.{global => js}
+import js.Dynamic.{global => g}
 
 // HTTP support
 import fr.hmil.roshttp.Protocol.HTTP
@@ -70,7 +70,7 @@ object MistClient extends JSApp{
     jQuery("#textBox").append(s"<p> You've been asked to encode: </p> <p> ${work.payload} </p>")
     jQuery("#loader").show()
 
-    val hashCode = js.sha256(work.payload).asInstanceOf[String]
+    val hashCode = g.sha256(work.payload).asInstanceOf[String]
 
     //Sending the response
     val jsonData = work.formResponse(hashCode)
@@ -101,7 +101,7 @@ object MistClient extends JSApp{
 }
 
 class WorkUnit(rawBody: String){
-  val params = js.JSON.parse(rawBody)
+  val params = g.JSON.parse(rawBody)
 
   val payload = params.payload.asInstanceOf[String]
   private val wid = params.wid.asInstanceOf[String]
