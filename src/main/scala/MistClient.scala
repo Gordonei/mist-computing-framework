@@ -80,7 +80,7 @@ object MistClient extends JSApp{
     appendText(Seq("You've been asked to encode:",s"${work.payload}"))
     jQuery("#loader").show()
 
-    val workResult = Applications.process(work.aid,work.payload)
+    val workResult = Applications.process(work.payload,work.aid)
 
     //Sending the response
     val jsonData = work.formResponse(workResult)
@@ -90,7 +90,7 @@ object MistClient extends JSApp{
       case res:Success[SimpleHttpResponse] =>
         jQuery("#loader").hide()
         appendText(Seq("Response accepted","Redirecting..."))
-        appendText(Seq("Response code ${res.get.statusCode}"))
+        appendText(Seq(s"Response code ${res.get.statusCode}"))
 
         val responseCode = res.get.statusCode
         responseCode match{
@@ -118,7 +118,7 @@ object Applications {
     aid match {
       case "sha256" => g.sha256(payload).asInstanceOf[String]
       case _ =>
-        jQuery("#textBox").append("<p> Request for work failed </p>")
+        MistClient.appendText(Seq(s"Request for work failed"))
         throw new Exception("Couldn't get any work")
     }
   }
@@ -135,6 +135,8 @@ class WorkUnit(rawBody: String){
   private val wid = params.wid.asInstanceOf[String]
   // Client ID
   private val cid = params.cid.asInstanceOf[String]
+
+  println(s"$payload aid=$aid wid=$wid cid=$cid")
 
   def formResponse (responsePayload: String) =
     JSONObject("payload" -> responsePayload,"wid" -> wid,"cid" -> cid,"aid" -> aid)
