@@ -1,11 +1,18 @@
 package mist.client
 
+import fr.hmil.roshttp.exceptions.{HttpException, TimeoutException}
+
+import scala.annotation.tailrec
+import scala.concurrent.duration._
+
 // Scala.js
 import org.scalajs.dom
 import org.scalajs.jquery.jQuery
+
 import scala.scalajs.js
 import scala.scalajs.js.JSApp
 import js.Dynamic.{global => g}
+import scala.concurrent.duration.FiniteDuration
 
 // HTTP support
 import fr.hmil.roshttp.Protocol.HTTP
@@ -26,6 +33,8 @@ object MistClient extends JSApp{
     def when(f: Boolean)(g: A => A) = if (f) g(a) else a
   }
 
+  val HTTP_TIMEOUT = 1
+
   // HTTP Request forming
   def formHttpRequest(query: String = "InterestingArticle",
                       path: String = "/."): HttpRequest = {
@@ -33,6 +42,7 @@ object MistClient extends JSApp{
       .withProtocol(HTTP)
       .withHost(WorkServerAddress)
       .withPort(WorkServerPort)
+      .withTimeout(new FiniteDuration(HTTP_TIMEOUT,SECONDS))
       .when(path != null)(_.withPath(path))
       .when(query != null)(_.withQueryString(query))
 
@@ -52,7 +62,11 @@ object MistClient extends JSApp{
 
   // Making GET request for work
   def askForWork(): Unit = {
-    val req = WorkRequest.send()
+    val req = WorkRequest.send().recover({
+      case TimeoutException (e) =>
+        appendText(Seq("Timed out, retrying"))
+        askForWork()
+    })
 
     req.onComplete({
       case res: Success[SimpleHttpResponse] =>
@@ -62,7 +76,7 @@ object MistClient extends JSApp{
         doTheWork(responseBody)
 
       case e: Failure[SimpleHttpResponse] =>
-        appendText(Seq("Request for work failed"))
+        appendText(Seq("Request for work failed",s"Error ${e.get.body}"))
         throw new Exception("Couldn't get any work")
     })
   }
@@ -77,7 +91,7 @@ object MistClient extends JSApp{
   def doTheWork(responseBody: String): Unit = {
     val work = new WorkUnit(responseBody)
 
-    appendText(Seq("You've been asked to encode:",s"${work.payload}"))
+    appendText(Seq("You've been asked to encode:",work.payload))
     jQuery("#loader").show()
 
     val workResult = Applications.process(work.payload,work.aid)
@@ -85,12 +99,17 @@ object MistClient extends JSApp{
     //Sending the response
     val jsonData = work.formResponse(workResult)
 
-    val req = WorkRequest.put(jsonData)
+    val req = WorkRequest.put(jsonData).recover({
+      case TimeoutException (e) =>
+        appendText(Seq("Timed out, retrying"))
+        doTheWork(responseBody)
+    })
+
     req.onComplete({
-      case res:Success[SimpleHttpResponse] =>
+      case res: Success[SimpleHttpResponse] =>
         jQuery("#loader").hide()
         appendText(Seq("Response accepted","Redirecting..."))
-        appendText(Seq(s"Response code ${res.get.statusCode}"))
+        appendText(Seq(s"Response code: ${res.get.statusCode}"))
 
         val responseCode = res.get.statusCode
         responseCode match{
@@ -99,6 +118,7 @@ object MistClient extends JSApp{
           // 204 means there is more work to do
           case 204 => askForWork()
         }
+
       case e: Failure[SimpleHttpResponse] =>
         appendText(Seq("Response not accepted"))
     })
@@ -106,7 +126,7 @@ object MistClient extends JSApp{
 
   def main(): Unit = {
     jQuery("#loader").hide()
-    appendText(Seq(s"Sending Request to server $WorkServerAddress"))
+    appendText(Seq(s"Sending request to server $WorkServerAddress"))
 
     askForWork()
   }
