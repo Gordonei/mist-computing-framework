@@ -94,8 +94,8 @@ class TwitterUrlGetter:
 
         # If this is a new Spindle, start and store it
         if(list_name not in self.url_spindles):
-            self.url_spindles[list_name].start()
             self.url_spindles[list_name] = url_spindle
+            self.url_spindles[list_name].start()
 
         return url_spindle
 
