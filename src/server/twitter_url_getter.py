@@ -49,6 +49,10 @@ class UrlSetSpindle(threading.Thread):
         # Choosing a URL at random
         self.logger.debug("Choosing a URL at random")
 
+        # Blocking on an empty set
+        while(len(self.url_set) == 0):
+            pass
+
         self.url_lock.acquire()
         url = self.url_set.pop()
         self.url_lock.release()
