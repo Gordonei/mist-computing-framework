@@ -4,8 +4,6 @@
 import http.server
 import logging
 import random
-import time
-import hashlib
 import json
 
 # Mine
@@ -14,6 +12,7 @@ import twitter_url_getter
 
 PORT = 8000
 
+DIFFICULTY = 100
 
 class GetHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
@@ -40,11 +39,11 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
 
-        choice = random.randint(0, len(quotes.RANDOM_QUOTES()))
-        quote = quotes.RANDOM_QUOTES()[choice]
+        choice = random.randint(0, len(quotes.RANDOM_QUOTES())-1)
+        quote,check = quotes.RANDOM_QUOTES()[choice]
         logger.debug("Asking to encode %s (%d)" % (quote, choice))
 
-        response_dict = {"payload":quotes.RANDOM_QUOTES()[choice],
+        response_dict = {"payload":quote,
                          "wid":str(choice),
                          "cid":str(0),
                          "aid":"sha256"}
@@ -64,14 +63,16 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
 
         logger.debug("Checking response")
         wid = int(response["wid"])
-        check = hashlib.sha256(quotes.RANDOM_QUOTES()[int(wid)].encode("utf-8")).hexdigest()
+        quote,check = quotes.RANDOM_QUOTES()[wid]
 
         self.log_message(" Correct response: %s",check)
+        if(check == response["payload"].encode("utf-8")):
+            self.log_message("MISMATCH!")
 
         # Response Code
         # 204 means try again
         # 200 means redirect link included
-        retry = random.randint(0,10) < 9
+        retry = random.randint(0,DIFFICULTY) < DIFFICULTY - 1
 
         if(retry):
             self.send_response(204)
@@ -85,6 +86,7 @@ class GetHandler(http.server.SimpleHTTPRequestHandler):
         if not(retry):
             redirect_url = url_getter.get_url("Gord1ei/news-journos")
             response_message = redirect_url.encode("utf-8")
+            print("response message:",response_message)
             self.wfile.write(response_message)
 
         return
@@ -94,7 +96,9 @@ logger.setLevel("DEBUG")
 FORMAT = '%(asctime)-15s %(message)s'
 logging.basicConfig(format=FORMAT)
 
-url_getter = twitter_url_getter.TwitterUrlGetter()
+url_getter = twitter_url_getter.TwitterUrlGetter(logger)
+url_getter.get_url("Gord1ei/news-journos")
+
 httpd = http.server.HTTPServer(("", PORT), GetHandler)
 
 httpd.serve_forever()

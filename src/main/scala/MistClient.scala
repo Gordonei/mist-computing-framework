@@ -92,7 +92,6 @@ object MistClient extends JSApp{
     val work = new WorkUnit(responseBody)
 
     appendText(Seq("You've been asked to encode:",work.payload))
-    jQuery("#loader").show()
 
     val workResult = Applications.process(work.payload,work.aid)
 
@@ -107,14 +106,15 @@ object MistClient extends JSApp{
 
     req.onComplete({
       case res: Success[SimpleHttpResponse] =>
-        jQuery("#loader").hide()
         appendText(Seq("Response accepted","Redirecting..."))
         appendText(Seq(s"Response code: ${res.get.statusCode}"))
 
         val responseCode = res.get.statusCode
         responseCode match{
-          // 200 means there is a response in the link
-          case 200 => redirect(res.get.body)
+          // 200 means there is a response with the link
+          case 200 =>
+            jQuery("#loader").hide()
+            redirect(res.get.body)
           // 204 means there is more work to do
           case 204 => askForWork()
         }
