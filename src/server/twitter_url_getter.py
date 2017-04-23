@@ -92,15 +92,14 @@ class TwitterUrlGetter:
         url_spindle = self.url_spindles.get(list_name,
                                             UrlSetSpindle(list_name,self.logger,self.api))
 
+        # If this is a new Spindle, start and store it
         if(list_name not in self.url_spindles):
+            self.url_spindles[list_name].start()
             self.url_spindles[list_name] = url_spindle
 
         return url_spindle
 
     def get_url(self,list_name):
         url_spindle = self.get_url_spindle(list_name)
-
-        if not url_spindle.is_alive():
-            url_spindle.start()
 
         return url_spindle.get_url()
